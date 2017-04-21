@@ -2,6 +2,7 @@
 //     http://underscorejs.org
 //     (c) 2009-2017 Jeremy Ashkenas, DocumentCloud and Investigative Reporters & Editors
 //     Underscore may be freely distributed under the MIT license.
+//     参考官方的javascript说明：http://www.ecma-international.org/ecma-262/5.1/
 
 (function() {
 
@@ -11,19 +12,37 @@
   // Establish the root object, `window` (`self`) in the browser, `global`
   // on the server, or `this` in some virtual machines. We use `self`
   // instead of `window` for `WebWorker` support.
+    // 运算符优先级：!>&&>||,权威指南 page 66
+    // browser => window, self => WebWorker, global => Node.js, this
+    // 真值，假值
+    // &&
+    // ||
   var root = typeof self == 'object' && self.self === self && self ||
             typeof global == 'object' && global.global === global && global ||
             this ||
             {};
 
   // Save the previous value of the `_` variable.
+    // 为恢复变量做铺垫，'_'是一个非常常用的变量
   var previousUnderscore = root._;
 
   // Save bytes in the minified (but not gzipped) version:
+    // 原型赋值，便于压缩
   var ArrayProto = Array.prototype, ObjProto = Object.prototype;
+  // 原始数据类型：Undefined、Null、Boolean、String、Number、Object、Symbol
   var SymbolProto = typeof Symbol !== 'undefined' ? Symbol.prototype : null;
 
   // Create quick reference variables for speed access to core prototypes.
+    // 将内置对象原型中的常用方法赋值给引用变量，以便更方便的引用
+    // 优化原则之一，减少查询的层次
+
+    // 编码规范：尽量遵循 https://github.com/airbnb/javascript/tree/es5-deprecated/es5#variables
+    // good
+    // var items = getItems();
+    // var goSportsTeam = true;
+    // var dragonball = 'z';
+
+    // hasOwnProperty 不包含继承来的属性
   var push = ArrayProto.push,
       slice = ArrayProto.slice,
       toString = ObjProto.toString,
@@ -36,12 +55,14 @@
       nativeCreate = Object.create;
 
   // Naked function reference for surrogate-prototype-swapping.
+  //  构建函数
   var Ctor = function(){};
 
   // Create a safe reference to the Underscore object for use below.
   var _ = function(obj) {
     if (obj instanceof _) return obj;
     if (!(this instanceof _)) return new _(obj);
+    // todo
     this._wrapped = obj;
   };
 
@@ -50,6 +71,7 @@
   // the browser, add `_` as a global object.
   // (`nodeType` is checked to ensure that `module`
   // and `exports` are not HTML elements.)
+    // 经典写法，适用于Node.js、AMD、Commonjs、浏览器环境
   if (typeof exports != 'undefined' && !exports.nodeType) {
     if (typeof module != 'undefined' && !module.nodeType && module.exports) {
       exports = module.exports = _;
@@ -65,6 +87,15 @@
   // Internal function that returns an efficient (for current engines) version
   // of the passed-in callback, to be repeatedly applied in other Underscore
   // functions.
+    // 高阶函数：一个函数就可以接收另一个函数作为参数，这种函数就称之为高阶函数
+    // 函数 => 变量 => 参数
+    // function add(x, y, f) {
+    //     return f(x) + f(y);
+    // }
+    // .apply在运行前要对作为参数的数组进行一系列检验和深拷贝，.call则没有这些步骤
+    // https://segmentfault.com/q/1010000007894513
+    // apply官方说明：http://www.ecma-international.org/ecma-262/5.1/#sec-15.3.4.3
+    // call官方说明：http://www.ecma-international.org/ecma-262/5.1/#sec-15.3.4.4
   var optimizeCb = function(func, context, argCount) {
     if (context === void 0) return func;
     switch (argCount) {
@@ -91,6 +122,7 @@
   // An internal function to generate callbacks that can be applied to each
   // element in a collection, returning the desired result — either `identity`,
   // an arbitrary callback, a property matcher, or a property accessor.
+    // 根据参数的不同类型，返回不同的处理函数
   var cb = function(value, context, argCount) {
     if (_.iteratee !== builtinIteratee) return _.iteratee(value, context);
     if (value == null) return _.identity;
@@ -102,12 +134,15 @@
   // External wrapper for our callback generator. Users may customize
   // `_.iteratee` if they want additional predicate/iteratee shorthand styles.
   // This abstraction hides the internal-only argCount argument.
+    // 迭代器
   _.iteratee = builtinIteratee = function(value, context) {
     return cb(value, context, Infinity);
   };
 
   // Similar to ES6's rest param (http://ariya.ofilabs.com/2013/03/es6-and-rest-parameter.html)
   // This accumulates the arguments passed into an array, after a given index.
+    // ES6 rest "...变量名" => 数组 代替 arguments => 类数组
+    // ES6 rest参数：只能是最后一个参数
   var restArgs = function(func, startIndex) {
     startIndex = startIndex == null ? func.length - 1 : +startIndex;
     return function() {
@@ -132,6 +167,7 @@
   };
 
   // An internal function for creating a new object that inherits from another.
+    // 经典方式：创建对象
   var baseCreate = function(prototype) {
     if (!_.isObject(prototype)) return {};
     if (nativeCreate) return nativeCreate(prototype);
@@ -141,12 +177,20 @@
     return result;
   };
 
+  // 浅属性，第一层属性
+    // 深复制／浅复制 值的复制与传递
   var shallowProperty = function(key) {
     return function(obj) {
       return obj == null ? void 0 : obj[key];
     };
   };
 
+    /**
+     * 获取对象的深层次属性
+     * @param obj
+     * @param path 应该是数组 如：{baby: {child: 'foo'}} => ['baby', 'child']
+     * @returns {*}
+     */
   var deepGet = function(obj, path) {
     var length = path.length;
     for (var i = 0; i < length; i++) {
@@ -160,8 +204,10 @@
   // should be iterated as an array or as an object.
   // Related: http://people.mozilla.org/~jorendorff/es6-draft.html#sec-tolength
   // Avoids a very nasty iOS 8 JIT bug on ARM-64. #2094
+    // 能表示的最大的整数范围
   var MAX_ARRAY_INDEX = Math.pow(2, 53) - 1;
   var getLength = shallowProperty('length');
+  // 类数组：arguments|NodeList
   var isArrayLike = function(collection) {
     var length = getLength(collection);
     return typeof length == 'number' && length >= 0 && length <= MAX_ARRAY_INDEX;
@@ -173,14 +219,18 @@
   // The cornerstone, an `each` implementation, aka `forEach`.
   // Handles raw objects in addition to array-likes. Treats all
   // sparse array-likes as if they were dense.
+  //  [DONE] 遍历，对象和数组、类数组对象
+  //  每次调用iteratee都会传递三个参数：(element, index, obj)。如果obj是个JavaScript对象，iteratee的参数是 (value, key, obj))。返回obj以方便链式调用。
   _.each = _.forEach = function(obj, iteratee, context) {
     iteratee = optimizeCb(iteratee, context);
     var i, length;
     if (isArrayLike(obj)) {
+      // 数组
       for (i = 0, length = obj.length; i < length; i++) {
         iteratee(obj[i], i, obj);
       }
     } else {
+      // 对象
       var keys = _.keys(obj);
       for (i = 0, length = keys.length; i < length; i++) {
         iteratee(obj[keys[i]], keys[i], obj);
@@ -190,6 +240,7 @@
   };
 
   // Return the results of applying the iteratee to each element.
+  //  [DONE] 通过转换函数(iteratee迭代器)映射列表中的每个值产生价值的新数组
   _.map = _.collect = function(obj, iteratee, context) {
     iteratee = cb(iteratee, context);
     var keys = !isArrayLike(obj) && _.keys(obj),
@@ -206,6 +257,7 @@
   var createReduce = function(dir) {
     // Wrap code that reassigns argument variables in a separate function than
     // the one that accesses `arguments.length` to avoid a perf hit. (#1991)
+    //  memo初始化值
     var reducer = function(obj, iteratee, memo, initial) {
       var keys = !isArrayLike(obj) && _.keys(obj),
           length = (keys || obj).length,
@@ -229,12 +281,18 @@
 
   // **Reduce** builds up a single result from a list of values, aka `inject`,
   // or `foldl`.
+  //  [DONE] 与 ES5 中 Array.prototype.reduce 使用方法类似，从左到右应用迭代器
+  //  参数说明见：createReduce
   _.reduce = _.foldl = _.inject = createReduce(1);
 
   // The right-associative version of reduce, also known as `foldr`.
+  //  [DONE]
   _.reduceRight = _.foldr = createReduce(-1);
 
   // Return the first value which passes a truth test. Aliased as `detect`.
+  //  `Aliased as`向后兼容
+  //  [DONE]在list中逐项查找，返回第一个通过predicate迭代函数真值检测的元素值，如果没有值传递给测试迭代器将返回undefined。
+  //  如果找到匹配的元素，函数将立即返回，不会遍历整个list
   _.find = _.detect = function(obj, predicate, context) {
     var keyFinder = isArrayLike(obj) ? _.findIndex : _.findKey;
     var key = keyFinder(obj, predicate, context);
@@ -243,9 +301,11 @@
 
   // Return all the elements that pass a truth test.
   // Aliased as `select`.
+  //  [DONE]遍历list中的每个值，返回包含所有通过predicate真值检测的元素值。
   _.filter = _.select = function(obj, predicate, context) {
     var results = [];
     predicate = cb(predicate, context);
+    // list见_.each方法说明
     _.each(obj, function(value, index, list) {
       if (predicate(value, index, list)) results.push(value);
     });
@@ -253,12 +313,14 @@
   };
 
   // Return all the elements for which a truth test fails.
+  //  [DONE]返回list中没有通过predicate真值检测的元素集合，与filter相反
   _.reject = function(obj, predicate, context) {
     return _.filter(obj, _.negate(cb(predicate)), context);
   };
 
   // Determine whether all of the elements match a truth test.
   // Aliased as `all`.
+  //  所有元素都通过predicate的真值检测就返回true
   _.every = _.all = function(obj, predicate, context) {
     predicate = cb(predicate, context);
     var keys = !isArrayLike(obj) && _.keys(obj),
@@ -272,6 +334,7 @@
 
   // Determine if at least one element in the object matches a truth test.
   // Aliased as `any`.
+  //  与every相对，如果object中有任何一个元素通过 predicate 的真值检测就返回true。
   _.some = _.any = function(obj, predicate, context) {
     predicate = cb(predicate, context);
     var keys = !isArrayLike(obj) && _.keys(obj),
@@ -285,6 +348,7 @@
 
   // Determine if the array or object contains a given item (using `===`).
   // Aliased as `includes` and `include`.
+  //  [DONE]obj包含指定的item则返回true
   _.contains = _.includes = _.include = function(obj, item, fromIndex, guard) {
     if (!isArrayLike(obj)) obj = _.values(obj);
     if (typeof fromIndex != 'number' || guard) fromIndex = 0;
@@ -292,6 +356,7 @@
   };
 
   // Invoke a method (with arguments) on every item in a collection.
+  //  在每一个item上执行给定方法，包含参数
   _.invoke = restArgs(function(obj, path, args) {
     var contextPath, func;
     if (_.isFunction(path)) {
@@ -314,23 +379,27 @@
   });
 
   // Convenience version of a common use case of `map`: fetching a property.
+  // map的简化版本，萃取数组对象中某属性值，返回一个数组。
   _.pluck = function(obj, key) {
     return _.map(obj, _.property(key));
   };
 
   // Convenience version of a common use case of `filter`: selecting only objects
   // containing specific `key:value` pairs.
+  //  同filter
   _.where = function(obj, attrs) {
     return _.filter(obj, _.matcher(attrs));
   };
 
   // Convenience version of a common use case of `find`: getting the first object
   // containing specific `key:value` pairs.
+  //  同find
   _.findWhere = function(obj, attrs) {
     return _.find(obj, _.matcher(attrs));
   };
 
   // Return the maximum element (or element-based computation).
+  //  [DONE]返回list中的最大值。如果传递iteratee参数，iteratee将作为list中每个值的排序依据。
   _.max = function(obj, iteratee, context) {
     var result = -Infinity, lastComputed = -Infinity,
         value, computed;
@@ -356,6 +425,7 @@
   };
 
   // Return the minimum element (or element-based computation).
+  //  如：max
   _.min = function(obj, iteratee, context) {
     var result = Infinity, lastComputed = Infinity,
         value, computed;
@@ -381,6 +451,7 @@
   };
 
   // Shuffle a collection.
+  //  乱序
   _.shuffle = function(obj) {
     return _.sample(obj, Infinity);
   };
@@ -389,6 +460,7 @@
   // [Fisher-Yates shuffle](http://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
   // If **n** is not specified, returns a single random element.
   // The internal `guard` argument allows it to work with `map`.
+  //  [DONE]随机样本
   _.sample = function(obj, n, guard) {
     if (n == null || guard) {
       if (!isArrayLike(obj)) obj = _.values(obj);
@@ -396,6 +468,7 @@
     }
     var sample = isArrayLike(obj) ? _.clone(obj) : _.values(obj);
     var length = getLength(sample);
+    // 对0和负值的处理
     n = Math.max(Math.min(n, length), 0);
     var last = length - 1;
     for (var index = 0; index < n; index++) {
@@ -408,25 +481,27 @@
   };
 
   // Sort the object's values by a criterion produced by an iteratee.
-  _.sortBy = function(obj, iteratee, context) {
-    var index = 0;
-    iteratee = cb(iteratee, context);
-    return _.pluck(_.map(obj, function(value, key, list) {
-      return {
-        value: value,
-        index: index++,
-        criteria: iteratee(value, key, list)
-      };
-    }).sort(function(left, right) {
-      var a = left.criteria;
-      var b = right.criteria;
-      if (a !== b) {
-        if (a > b || a === void 0) return 1;
-        if (a < b || b === void 0) return -1;
-      }
-      return left.index - right.index;
-    }), 'value');
-  };
+  // 排序
+    _.sortBy = function (obj, iteratee, context) {
+        var index = 0;
+        iteratee = cb(iteratee, context);
+        return _.pluck(_.map(obj, function (value, key, list) {
+                return {
+                    value: value,
+                    index: index++,
+                    criteria: iteratee(value, key, list)
+                };
+            }).sort(function (left, right) {
+                var a = left.criteria;
+                var b = right.criteria;
+                if (a !== b) {
+                    if (a > b || a === void 0) return 1;
+                    if (a < b || b === void 0) return -1;
+                }
+                return left.index - right.index;
+            }),
+            'value');
+    };
 
   // An internal function used for aggregate "group by" operations.
   var group = function(behavior, partition) {
@@ -443,6 +518,7 @@
 
   // Groups the object's values by a criterion. Pass either a string attribute
   // to group by, or a function that returns the criterion.
+  // 根据特定规则对数组或者对象中的元素进行分组
   _.groupBy = group(function(result, value, key) {
     if (_.has(result, key)) result[key].push(value); else result[key] = [value];
   });
@@ -650,6 +726,7 @@
   };
 
   // Generator function to create the findIndex and findLastIndex functions.
+  //  [DONE] dir遍历的方向
   var createPredicateIndexFinder = function(dir) {
     return function(array, predicate, context) {
       predicate = cb(predicate, context);
@@ -914,6 +991,7 @@
   };
 
   // Returns a negated version of the passed-in predicate.
+  //  返回一个新的predicate函数的否定版本
   _.negate = function(predicate) {
     return function() {
       return !predicate.apply(this, arguments);
@@ -987,17 +1065,21 @@
 
   // Retrieve the names of an object's own properties.
   // Delegates to **ECMAScript 5**'s native `Object.keys`.
+  //  [DONE] 检索object拥有的所有可枚举属性的名称
   _.keys = function(obj) {
     if (!_.isObject(obj)) return [];
+    //1
     if (nativeKeys) return nativeKeys(obj);
     var keys = [];
+    //2
     for (var key in obj) if (_.has(obj, key)) keys.push(key);
-    // Ahem, IE < 9.
+    // 3 Ahem, IE < 9.
     if (hasEnumBug) collectNonEnumProps(obj, keys);
     return keys;
   };
 
   // Retrieve all the property names of an object.
+  //  [DONE] 所有key，包含继承来的
   _.allKeys = function(obj) {
     if (!_.isObject(obj)) return [];
     var keys = [];
@@ -1008,6 +1090,7 @@
   };
 
   // Retrieve the values of an object's properties.
+  //  [DONE]返回object对象所有的属性值
   _.values = function(obj) {
     var keys = _.keys(obj);
     var length = keys.length;
@@ -1084,13 +1167,16 @@
   };
 
   // Extend a given object with all the properties in passed-in object(s).
+  //  复制source对象中的**所有属性**覆盖到destination对象上，有顺序
   _.extend = createAssigner(_.allKeys);
 
   // Assigns a given object with all the own properties in the passed-in object(s).
   // (https://developer.mozilla.org/docs/Web/JavaScript/Reference/Global_Objects/Object/assign)
+  //  类似于 extend, 但只复制自己的属性覆盖到目标对象。
   _.extendOwn = _.assign = createAssigner(_.keys);
 
   // Returns the first key on an object that passes a predicate test.
+  //  [DONE]类似于findIndex，返回第一个key
   _.findKey = function(obj, predicate, context) {
     predicate = cb(predicate, context);
     var keys = _.keys(obj), key;
@@ -1153,6 +1239,8 @@
   };
 
   // Create a (shallow-cloned) duplicate of an object.
+  //  浅克隆
+  //  [深入剖析 JavaScript 的深复制] http://jerryzou.com/posts/dive-into-deep-clone-in-javascript/
   _.clone = function(obj) {
     if (!_.isObject(obj)) return obj;
     return _.isArray(obj) ? obj.slice() : _.extend({}, obj);
@@ -1167,6 +1255,7 @@
   };
 
   // Returns whether an object has a given set of `key:value` pairs.
+  // [DONE] attrs键和值是否包含在object中
   _.isMatch = function(object, attrs) {
     var keys = _.keys(attrs), length = keys.length;
     if (object == null) return !length;
@@ -1366,6 +1455,7 @@
 
   // Shortcut function for checking if an object has a given property directly
   // on itself (in other words, not on a prototype).
+  //   对象是否包含给定的键，不包含继承，增加了深层次函数的判断
   _.has = function(obj, path) {
     if (!_.isArray(path)) {
       return obj != null && hasOwnProperty.call(obj, path);
@@ -1392,6 +1482,7 @@
   };
 
   // Keep the identity function around for default iteratees.
+  //  返回与传入参数相等的值，默认的迭代器
   _.identity = function(value) {
     return value;
   };
@@ -1405,6 +1496,7 @@
 
   _.noop = function(){};
 
+  // 区分参数类型：数组与非数组
   _.property = function(path) {
     if (!_.isArray(path)) {
       return shallowProperty(path);
@@ -1426,6 +1518,7 @@
 
   // Returns a predicate for checking whether an object has a given set of
   // `key:value` pairs.
+    // [DONE] 返回一个断言，判断给定对象是否包含给定的键值对
   _.matcher = _.matches = function(attrs) {
     attrs = _.extendOwn({}, attrs);
     return function(obj) {
@@ -1442,7 +1535,9 @@
   };
 
   // Return a random integer between min and max (inclusive).
+  //  [DONE]随机数
   _.random = function(min, max) {
+    //一个参数时，min就是最大值范围
     if (max == null) {
       max = min;
       min = 0;
